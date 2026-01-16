@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "bin": {
-    "dbml_formatter": "./bin/dbml_formatter.js"
+    "dbml-formatter": "./bin/dbml-formatter.js"
   },
   "dependencies": {
     "@dbml/core": "^5.4.1",
