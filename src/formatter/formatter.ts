@@ -161,6 +161,9 @@ export function format(input: string, options: FormatterOptions = {}): string {
                      } else {
                          output += '\n\n';
                      }
+                 } else {
+                     // NEW: If no table note, add empty Note: ""
+                     output += getIndent() + 'Note: ""\n\n';
                  }
                  
                  // 5. Print other lines (Process Fields)

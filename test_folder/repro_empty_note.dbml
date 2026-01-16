@@ -1,0 +1,4 @@
+Table Users {
+    id integer
+    name varchar
+}
