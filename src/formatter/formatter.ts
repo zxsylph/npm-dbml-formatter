@@ -38,7 +38,8 @@ export function format(input: string, options: FormatterOptions = {}): string {
                  const t = rawTokens[searchIndex];
                  if (t.type === TokenType.Symbol && (t.value === '}' || t.value === '{')) break;
                  if (t.type === TokenType.Word) {
-                     if (t.value === 'Table') {
+                     // Check case-insensitive
+                     if (t.value.toLowerCase() === 'table') {
                          isTable = true;
                          break;
                      }
@@ -368,10 +369,35 @@ export function format(input: string, options: FormatterOptions = {}): string {
             if (needsSpace) output += ' ';
         }
         
-        // Now print the token value (formatting strings if needed)
-        // We can use a simple switch or reuse `processTokens` logic but mostly just string quoting.
-        
+        // Output with Keyword Normalization
         switch (token.type) {
+            case TokenType.Word:
+                // Global Keyword PascalCase
+                // table -> Table
+                if (token.value.toLowerCase() === 'table') {
+                    token.value = 'Table';
+                }
+                
+                // ref -> Ref
+                if (token.value.toLowerCase() === 'ref') {
+                    token.value = 'Ref';
+                }
+                
+                // note -> Note (if followed by colon?)
+                if (token.value.toLowerCase() === 'note') {
+                     // Check next token for `:`
+                     let nextIdx = i + 1;
+                     while(nextIdx < rawTokens.length && (rawTokens[nextIdx].type === TokenType.Whitespace || rawTokens[nextIdx].type === TokenType.Comment)) {
+                         nextIdx++;
+                     }
+                     if (nextIdx < rawTokens.length && rawTokens[nextIdx].type === TokenType.Symbol && rawTokens[nextIdx].value === ':') {
+                         token.value = 'Note';
+                     }
+                }
+                
+                output += token.value;
+                break;
+                
             case TokenType.String:
                 let val = token.value;
                 if (val.startsWith("'") && !val.startsWith("'''")) {
@@ -494,7 +520,24 @@ function processTokens(
                       localOutput += token.value;
                  }
                  break;
-                 
+             
+             case TokenType.Word:
+                  // Handle keyword PascalCase in buffer
+                  if (token.value.toLowerCase() === 'table') token.value = 'Table';
+                  if (token.value.toLowerCase() === 'ref') token.value = 'Ref';
+                  if (token.value.toLowerCase() === 'note') {
+                       // Peek locally inside tokens list
+                        let nextIdx = i + 1;
+                        while(nextIdx < tokens.length && (tokens[nextIdx].type === TokenType.Whitespace || tokens[nextIdx].type === TokenType.Comment)) {
+                            nextIdx++;
+                        }
+                        if (nextIdx < tokens.length && tokens[nextIdx].type === TokenType.Symbol && tokens[nextIdx].value === ':') {
+                            token.value = 'Note';
+                        }
+                  }
+                  localOutput += token.value;
+                  break;
+
              case TokenType.String:
                 let val = token.value;
                 if (val.startsWith("'") && !val.startsWith("'''")) {
