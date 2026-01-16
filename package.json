@@ -1,5 +1,5 @@
 {
-  "name": "dbml-extension",
+  "name": "@zxsylph/dbml-formatter",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
