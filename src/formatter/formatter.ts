@@ -4,6 +4,7 @@ export interface FormatterOptions {
     indentSize?: number;
     useTabs?: boolean;
     orderField?: boolean;
+    addNote?: boolean;
 }
 
 export function format(input: string, options: FormatterOptions = {}): string {
@@ -164,7 +165,9 @@ export function format(input: string, options: FormatterOptions = {}): string {
                      }
                  } else {
                      // NEW: If no table note, add empty Note: ""
-                     output += getIndent() + 'Note: ""\n\n';
+                     if (options.addNote) {
+                        output += getIndent() + 'Note: ""\n\n';
+                     }
                  }
 
                  // OPTIONAL: Sort Fields within groups
@@ -328,64 +331,64 @@ export function format(input: string, options: FormatterOptions = {}): string {
                          }
                      }
                      
-                     if (isField) {
-                         // Find settings block
-                         let openBracketIdx = -1;
-                         let closeBracketIdx = -1;
-                         for(let idx=0; idx<lineTokens.length; idx++) {
-                             if (lineTokens[idx].type === TokenType.Symbol && lineTokens[idx].value === '[') openBracketIdx = idx;
-                             if (lineTokens[idx].type === TokenType.Symbol && lineTokens[idx].value === ']') closeBracketIdx = idx;
-                         }
-                         
-                         if (openBracketIdx !== -1 && closeBracketIdx !== -1 && closeBracketIdx > openBracketIdx) {
-                             // Settings exist. Check if 'note' is present.
-                             const inside = lineTokens.slice(openBracketIdx + 1, closeBracketIdx);
-                             let hasNote = false;
-                             
-                             // Simple token scan for 'note' word
-                             // Ideally we should parse comma groups, but 'note' keyword is reserved in settings.
-                             for (const t of inside) {
-                                 if (t.type === TokenType.Word && t.value.toLowerCase() === 'note') {
-                                     hasNote = true;
-                                     break;
-                                 }
-                             }
-                             
-                             if (!hasNote) {
-                                 // Insert `note: ""` at the beginning of settings
-                                 // We need to insert: "note", ":", "\"\"", ","
-                                 const newTokens: Token[] = [
-                                     { type: TokenType.Word, value: 'note', line: 0, column: 0 },
-                                     { type: TokenType.Symbol, value: ':', line: 0, column: 0 },
-                                     { type: TokenType.String, value: '""', line: 0, column: 0 },
-                                     { type: TokenType.Symbol, value: ',', line: 0, column: 0 }
-                                 ];
-                                 lineTokens.splice(openBracketIdx + 1, 0, ...newTokens);
-                             }
-                         } else {
-                             // No settings exist. Append ` [note: ""]`.
-                             
-                             // Find last meaningful token index
-                             let lastMeaningfulIdx = -1;
-                             for (let idx = lineTokens.length - 1; idx >= 0; idx--) {
-                                 if (lineTokens[idx].type !== TokenType.Whitespace && lineTokens[idx].type !== TokenType.Comment) {
-                                     lastMeaningfulIdx = idx;
-                                     break;
-                                 }
-                             }
-                             
-                             if (lastMeaningfulIdx !== -1) {
-                                 const appendTokens: Token[] = [
-                                     { type: TokenType.Symbol, value: '[', line: 0, column: 0 },
-                                     { type: TokenType.Word, value: 'note', line: 0, column: 0 },
-                                     { type: TokenType.Symbol, value: ':', line: 0, column: 0 },
-                                     { type: TokenType.String, value: '""', line: 0, column: 0 },
-                                     { type: TokenType.Symbol, value: ']', line: 0, column: 0 }
-                                 ];
-                                 lineTokens.splice(lastMeaningfulIdx + 1, 0, ...appendTokens);
-                             }
-                         }
-                     }
+                     if (isField && options.addNote) {
+                          // Find settings block
+                          let openBracketIdx = -1;
+                          let closeBracketIdx = -1;
+                          for(let idx=0; idx<lineTokens.length; idx++) {
+                              if (lineTokens[idx].type === TokenType.Symbol && lineTokens[idx].value === '[') openBracketIdx = idx;
+                              if (lineTokens[idx].type === TokenType.Symbol && lineTokens[idx].value === ']') closeBracketIdx = idx;
+                          }
+                          
+                          if (openBracketIdx !== -1 && closeBracketIdx !== -1 && closeBracketIdx > openBracketIdx) {
+                              // Settings exist. Check if 'note' is present.
+                              const inside = lineTokens.slice(openBracketIdx + 1, closeBracketIdx);
+                              let hasNote = false;
+                              
+                              // Simple token scan for 'note' word
+                              // Ideally we should parse comma groups, but 'note' keyword is reserved in settings.
+                              for (const t of inside) {
+                                  if (t.type === TokenType.Word && t.value.toLowerCase() === 'note') {
+                                      hasNote = true;
+                                      break;
+                                  }
+                              }
+                              
+                              if (!hasNote) {
+                                  // Insert `note: ""` at the beginning of settings
+                                  // We need to insert: "note", ":", "\"\"", ","
+                                  const newTokens: Token[] = [
+                                      { type: TokenType.Word, value: 'note', line: 0, column: 0 },
+                                      { type: TokenType.Symbol, value: ':', line: 0, column: 0 },
+                                      { type: TokenType.String, value: '""', line: 0, column: 0 },
+                                      { type: TokenType.Symbol, value: ',', line: 0, column: 0 }
+                                  ];
+                                  lineTokens.splice(openBracketIdx + 1, 0, ...newTokens);
+                              }
+                          } else {
+                              // No settings exist. Append ` [note: ""]`.
+                              
+                              // Find last meaningful token index
+                              let lastMeaningfulIdx = -1;
+                              for (let idx = lineTokens.length - 1; idx >= 0; idx--) {
+                                  if (lineTokens[idx].type !== TokenType.Whitespace && lineTokens[idx].type !== TokenType.Comment) {
+                                      lastMeaningfulIdx = idx;
+                                      break;
+                                  }
+                              }
+                              
+                              if (lastMeaningfulIdx !== -1) {
+                                  const appendTokens: Token[] = [
+                                      { type: TokenType.Symbol, value: '[', line: 0, column: 0 },
+                                      { type: TokenType.Word, value: 'note', line: 0, column: 0 },
+                                      { type: TokenType.Symbol, value: ':', line: 0, column: 0 },
+                                      { type: TokenType.String, value: '""', line: 0, column: 0 },
+                                      { type: TokenType.Symbol, value: ']', line: 0, column: 0 }
+                                  ];
+                                  lineTokens.splice(lastMeaningfulIdx + 1, 0, ...appendTokens);
+                              }
+                          }
+                      }
 
                      // Apply "Quote Data Types" logic
                     let wordCount = 0;

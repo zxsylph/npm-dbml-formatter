@@ -1,4 +1,7 @@
-table   messy{id int[pk]
+table   messy{
+    
+    
+    id int[pk]
 name varchar
 a_id int [ref: > other.id, note: 'other.id']
 table_id int [note: 'link to table table']

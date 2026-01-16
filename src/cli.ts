@@ -55,7 +55,7 @@ if (folderIndex !== -1) {
         files.forEach(file => {
              try {
                 const content = fs.readFileSync(file, 'utf-8');
-                const formatted = format(content, { orderField });
+                const formatted = format(content, { orderField, addNote: args.includes('--add-note') });
                 
                 if (isDryRun) {
                     console.log(`\n--- Dry Run: ${file} ---`);
@@ -88,7 +88,7 @@ if (folderIndex !== -1) {
 
     try {
         const content = fs.readFileSync(absPath, 'utf-8');
-        const formatted = format(content, { orderField });
+        const formatted = format(content, { orderField, addNote: args.includes('--add-note') });
         console.log(formatted);
     } catch (error) {
         console.error('Error formatting file:', error);
