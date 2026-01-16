@@ -145,6 +145,21 @@ export function format(input: string, options: FormatterOptions = {}): string {
                          otherLinesGroups.push(currentGroup);
                      }
                  }
+
+                 // NEW: Trim leading and trailing empty lines (whitespace-only groups) from otherLinesGroups
+                 // Note: we do not touch tableNoteTokens here.
+                 
+                 const isWhitespaceGroup = (g: Token[]) => g.every(t => t.type === TokenType.Whitespace);
+                 
+                 // Trim start
+                 while (otherLinesGroups.length > 0 && isWhitespaceGroup(otherLinesGroups[0])) {
+                     otherLinesGroups.shift();
+                 }
+                 
+                 // Trim end
+                 while (otherLinesGroups.length > 0 && isWhitespaceGroup(otherLinesGroups[otherLinesGroups.length - 1])) {
+                     otherLinesGroups.pop();
+                 }
                  
                  // 4. Print Table Note first (if exists)
                  if (tableNoteTokens.length > 0) {
