@@ -468,26 +468,38 @@ export function format(input: string, options: FormatterOptions = {}): string {
                              }
                          }
                          
-                         if (settingsIdx === -1) continue; // Should have settings by now due to transformation
-                         
-                         // Type is between Name and Settings
-                         // Need to identify start/end of type
-                         // Name is at nameIdx.
-                         // Type starts after name. (Skip whitespace)
+                         // Determine Type Range
+                         // Type is between Name and Settings (or End of Line)
                          let typeStart = nameIdx + 1;
-                         while(typeStart < settingsIdx && (line[typeStart].type === TokenType.Whitespace || line[typeStart].type === TokenType.Comment)) {
+                         while(typeStart < line.length && (line[typeStart].type === TokenType.Whitespace || line[typeStart].type === TokenType.Comment)) {
                              typeStart++;
                          }
+
+                         let typeEnd = settingsIdx;
+                         if (typeEnd === -1) {
+                             // No settings, type ends at the last meaningful token of the line
+                             let lastMeaningful = -1;
+                             for(let k=line.length-1; k >= 0; k--) {
+                                 if (line[k].type !== TokenType.Whitespace && line[k].type !== TokenType.Comment) {
+                                     lastMeaningful = k;
+                                     break;
+                                 }
+                             }
+                             
+                             if (lastMeaningful > nameIdx) {
+                                 typeEnd = lastMeaningful + 1; // exclusive
+                             } else {
+                                 continue; 
+                             }
+                         }
                          
-                         // Type ends at settingsIdx.
-                         // Let's verify we have content.
-                         if (typeStart >= settingsIdx) continue;
-                         
+                         if (typeStart >= typeEnd) continue;
+                          
                          // Calculate Widths
                          const nameWidth = line[nameIdx].value.length;
                          
                          // Dry run type width
-                         const typeTokens = line.slice(typeStart, settingsIdx);
+                         const typeTokens = line.slice(typeStart, typeEnd);
                          const typeStr = processTokens(typeTokens, 0, ' ', 2, false); 
                          const typeWidth = typeStr.length;
                          
@@ -495,7 +507,7 @@ export function format(input: string, options: FormatterOptions = {}): string {
                              lineTokens: line,
                              nameTokenIdx: nameIdx,
                              typeStartIdx: typeStart,
-                             typeEndIdx: settingsIdx,
+                             typeEndIdx: typeEnd,
                              settingsStartIdx: settingsIdx,
                              nameWidth,
                              typeWidth
@@ -516,34 +528,24 @@ export function format(input: string, options: FormatterOptions = {}): string {
                          nameTok.padRight = namePad;
                          
                          // Pad Type (Last token of type sequence)
-                         const typePad = (maxTypeWidth - row.typeWidth) + 1;
-                         // Find the last meaningful token of Type sequence
-                         // typeEndIdx is exclusive (index of `[`).
-                         let lastTypeTokIdx = row.typeEndIdx - 1;
-                         while(lastTypeTokIdx >= row.typeStartIdx && (row.lineTokens[lastTypeTokIdx].type === TokenType.Whitespace || row.lineTokens[lastTypeTokIdx].type === TokenType.Comment)) {
-                             lastTypeTokIdx--;
-                         }
-                         
-                         if (lastTypeTokIdx >= row.typeStartIdx) {
-                             row.lineTokens[lastTypeTokIdx].padRight = typePad;
+                         // Only needed if there is something after (settings)
+                         if (row.settingsStartIdx !== -1) {
+                             const typePad = (maxTypeWidth - row.typeWidth) + 1;
+                             // Find the last meaningful token of Type sequence
+                             let lastTypeTokIdx = row.typeEndIdx - 1;
+                             while(lastTypeTokIdx >= row.typeStartIdx && (row.lineTokens[lastTypeTokIdx].type === TokenType.Whitespace || row.lineTokens[lastTypeTokIdx].type === TokenType.Comment)) {
+                                 lastTypeTokIdx--;
+                             }
+                             
+                             if (lastTypeTokIdx >= row.typeStartIdx) {
+                                 row.lineTokens[lastTypeTokIdx].padRight = typePad;
+                             }
                          }
                      }
                  };
 
-                 let fieldBlockStart = -1;
-                 for (let i = 0; i <= otherLinesGroups.length; i++) {
-                     const line = i < otherLinesGroups.length ? otherLinesGroups[i] : null;
-                     const isField = line ? isFieldLine(line) : false;
-                     
-                     if (isField) {
-                         if (fieldBlockStart === -1) fieldBlockStart = i;
-                     } else {
-                         if (fieldBlockStart !== -1) {
-                             alignFieldBlock(otherLinesGroups.slice(fieldBlockStart, i));
-                             fieldBlockStart = -1;
-                         }
-                     }
-                 }
+                 // Align globally across all lines in the table (ignoring inter-field grouping)
+                 alignFieldBlock(otherLinesGroups);
 
                  // 5c. Print Pass
                  for (let lgIdx = 0; lgIdx < otherLinesGroups.length; lgIdx++) {
