@@ -1,0 +1,6 @@
+table alignment_test {
+  id int [pk]
+  name varchar(255)
+  is_active boolean [default: true]
+  very_long_field_name text [note: "long"]
+}

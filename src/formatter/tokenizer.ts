@@ -12,6 +12,7 @@ export interface Token {
     value: string;
     line: number;
     column: number;
+    padRight?: number;
 }
 
 export function tokenize(input: string): Token[] {

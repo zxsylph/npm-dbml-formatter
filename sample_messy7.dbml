@@ -1,0 +1,13 @@
+table   messy{id int[pk]
+name varchar
+a_id int [ref: > other.id, note: 'other.id']
+table_id int [note: 'link to table table']
+
+aaaaa int [pk]
+sdfasdfasdfasdfasf text []
+a number
+
+
+asdfsdfasdfasdf text []
+}
+Ref : messy.id>other.id

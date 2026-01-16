@@ -249,7 +249,9 @@ export function format(input: string, options: FormatterOptions = {}): string {
                      }
                  }
                  
-                 // 5. Print other lines (Process Fields)
+                 // 5. Process Fields (Transform -> Align -> Print)
+                 
+                 // 5a. Transformation Pass
                  for (let lgIdx = 0; lgIdx < otherLinesGroups.length; lgIdx++) {
                      const lineTokens = otherLinesGroups[lgIdx];
                      // Check for Field Settings `[...]` reordering
@@ -307,7 +309,7 @@ export function format(input: string, options: FormatterOptions = {}): string {
                          }
                      }
                      
-                     // 6. Apply "Empty Field Note" logic
+                     // Apply "Empty Field Note" logic
                      const meaningful = lineTokens.filter(t => t.type !== TokenType.Whitespace && t.type !== TokenType.Comment);
                      // Heuristic: Is this a field? 
                      // It should have at least 2 tokens (Name, Type). 
@@ -352,7 +354,6 @@ export function format(input: string, options: FormatterOptions = {}): string {
                              if (!hasNote) {
                                  // Insert `note: ""` at the beginning of settings
                                  // We need to insert: "note", ":", "\"\"", ","
-                                 // REMOVED explicit spaces
                                  const newTokens: Token[] = [
                                      { type: TokenType.Word, value: 'note', line: 0, column: 0 },
                                      { type: TokenType.Symbol, value: ':', line: 0, column: 0 },
@@ -363,7 +364,6 @@ export function format(input: string, options: FormatterOptions = {}): string {
                              }
                          } else {
                              // No settings exist. Append ` [note: ""]`.
-                             // REMOVED explicit spaces
                              
                              // Find last meaningful token index
                              let lastMeaningfulIdx = -1;
@@ -387,8 +387,7 @@ export function format(input: string, options: FormatterOptions = {}): string {
                          }
                      }
 
-                     // 7. Apply "Quote Data Types" logic
-
+                     // Apply "Quote Data Types" logic
                     let wordCount = 0;
                     for (const t of lineTokens) {
                          // Only count words before `[`?
@@ -398,39 +397,146 @@ export function format(input: string, options: FormatterOptions = {}): string {
                              if (wordCount === 2) {
                                  // Quote this token!
                                  t.value = `"${t.value}"`; 
-                                 // Note: we are modifying the token object directly in the buffer.
                              }
                          }
                          if (t.type === TokenType.String && wordCount < 2) { 
-                             // Strings count as words/tokens for position?
-                             // Example `name "varchar"` -> "varchar" IS the string.
                              wordCount++; 
                          }
                     }
+                 }
 
-                    // Ensure previous line enforced newline if missing?
-                    // processTokens appends tokens. If tokens lack newline, it might merge?
-                    // `lineTokens` usually comes from `currentGroup` which ended with newline token (except last one).
-                    // If last group lacks newline, and we print next group...
+                 // 5b. Alignment Pass
+                 const isFieldLine = (tokens: Token[]) => {
+                     const m = tokens.filter(t => t.type !== TokenType.Whitespace && t.type !== TokenType.Comment);
+                     if (m.length < 2) return false;
+                     const first = m[0].value.toLowerCase();
+                     if (first === 'indexes' || first === 'note') return false;
+                     if (tokens.some(t => t.type === TokenType.Symbol && t.value === '{')) return false;
+                     return true;
+                 };
+
+                 const alignFieldBlock = (blockLines: Token[][]) => {
+                     // 1. Collect info suitable for alignment
+                     interface RowInfo {
+                         lineTokens: Token[];
+                         nameTokenIdx: number;
+                         typeStartIdx: number;
+                         typeEndIdx: number; // exclusive
+                         settingsStartIdx: number;
+                         
+                         nameWidth: number;
+                         typeWidth: number;
+                     }
+                     
+                     const rows: RowInfo[] = [];
+                     
+                     for (const line of blockLines) {
+                         // Find Name Token (First meaningful)
+                         let nameIdx = -1;
+                         for(let k=0; k<line.length; k++) {
+                             if (line[k].type !== TokenType.Whitespace && line[k].type !== TokenType.Comment) {
+                                 nameIdx = k;
+                                 break;
+                             }
+                         }
+                         if (nameIdx === -1) continue;
+                         
+                         // Find Settings Start `[`
+                         let settingsIdx = -1;
+                         for(let k=0; k<line.length; k++) {
+                             if (line[k].type === TokenType.Symbol && line[k].value === '[') {
+                                 settingsIdx = k;
+                                 break;
+                             }
+                         }
+                         
+                         if (settingsIdx === -1) continue; // Should have settings by now due to transformation
+                         
+                         // Type is between Name and Settings
+                         // Need to identify start/end of type
+                         // Name is at nameIdx.
+                         // Type starts after name. (Skip whitespace)
+                         let typeStart = nameIdx + 1;
+                         while(typeStart < settingsIdx && (line[typeStart].type === TokenType.Whitespace || line[typeStart].type === TokenType.Comment)) {
+                             typeStart++;
+                         }
+                         
+                         // Type ends at settingsIdx.
+                         // Let's verify we have content.
+                         if (typeStart >= settingsIdx) continue;
+                         
+                         // Calculate Widths
+                         const nameWidth = line[nameIdx].value.length;
+                         
+                         // Dry run type width
+                         const typeTokens = line.slice(typeStart, settingsIdx);
+                         const typeStr = processTokens(typeTokens, 0, ' ', 2, false); 
+                         const typeWidth = typeStr.length;
+                         
+                         rows.push({
+                             lineTokens: line,
+                             nameTokenIdx: nameIdx,
+                             typeStartIdx: typeStart,
+                             typeEndIdx: settingsIdx,
+                             settingsStartIdx: settingsIdx,
+                             nameWidth,
+                             typeWidth
+                         });
+                     }
+                     
+                     if (rows.length === 0) return;
+                     
+                     // 2. Calc Max Widths
+                     const maxNameWidth = Math.max(...rows.map(r => r.nameWidth));
+                     const maxTypeWidth = Math.max(...rows.map(r => r.typeWidth));
+                     
+                     // 3. Apply Padding
+                     for (const row of rows) {
+                         // Pad Name
+                         const namePad = (maxNameWidth - row.nameWidth) + 1; // +1 for minimum space
+                         const nameTok = row.lineTokens[row.nameTokenIdx];
+                         nameTok.padRight = namePad;
+                         
+                         // Pad Type (Last token of type sequence)
+                         const typePad = (maxTypeWidth - row.typeWidth) + 1;
+                         // Find the last meaningful token of Type sequence
+                         // typeEndIdx is exclusive (index of `[`).
+                         let lastTypeTokIdx = row.typeEndIdx - 1;
+                         while(lastTypeTokIdx >= row.typeStartIdx && (row.lineTokens[lastTypeTokIdx].type === TokenType.Whitespace || row.lineTokens[lastTypeTokIdx].type === TokenType.Comment)) {
+                             lastTypeTokIdx--;
+                         }
+                         
+                         if (lastTypeTokIdx >= row.typeStartIdx) {
+                             row.lineTokens[lastTypeTokIdx].padRight = typePad;
+                         }
+                     }
+                 };
+
+                 let fieldBlockStart = -1;
+                 for (let i = 0; i <= otherLinesGroups.length; i++) {
+                     const line = i < otherLinesGroups.length ? otherLinesGroups[i] : null;
+                     const isField = line ? isFieldLine(line) : false;
+                     
+                     if (isField) {
+                         if (fieldBlockStart === -1) fieldBlockStart = i;
+                     } else {
+                         if (fieldBlockStart !== -1) {
+                             alignFieldBlock(otherLinesGroups.slice(fieldBlockStart, i));
+                             fieldBlockStart = -1;
+                         }
+                     }
+                 }
+
+                 // 5c. Print Pass
+                 for (let lgIdx = 0; lgIdx < otherLinesGroups.length; lgIdx++) {
+                     const lineTokens = otherLinesGroups[lgIdx];
+                     output += processTokens(lineTokens, indentLevel, indentChar, indentSize, true);
                     
-                    // Check if output buffer needs separation?
-                    // processTokens logic respects local newlines inside `lineTokens`.
-                    // But if `lineTokens` (last group) didn't have newline, we append.
-                    
-                    output += processTokens(lineTokens, indentLevel, indentChar, indentSize, true);
-                    
-                    // Heuristic: If we just printed a line group, and it didn't generate a newline at end,
-                    // AND there is another group coming, insert newline?
-                    // But `processTokens` output might end with proper indent? No.
-                    
-                    // Let's check `output`.
-                    if (lgIdx < otherLinesGroups.length - 1) {
-                        if (!output.endsWith('\n')) {
-                             // This implies the group didn't end with newline token.
-                             // Force it.
-                             output += '\n';
-                        }
-                    }
+                     if (lgIdx < otherLinesGroups.length - 1) {
+                         if (!output.endsWith('\n')) {
+                              output += '\n';
+                         }
+                     }
                  }
                  
                  // End block
@@ -654,6 +760,8 @@ function processTokens(
             if (needsSpace) localOutput += ' ';
         }
 
+
+
         switch (token.type) {
              case TokenType.Symbol:
                  if (token.value === '{') {
@@ -718,6 +826,10 @@ function processTokens(
              default:
                 localOutput += token.value;
                 break;
+        }
+
+        if (token.padRight) {
+             localOutput += ' '.repeat(token.padRight);
         }
     }
     
