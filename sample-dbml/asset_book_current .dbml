@@ -1,0 +1,12 @@
+Table asset_book_current {
+    Note: "สรุป คือ  AssetBook ที่ใช้ได้เท่านั้น เลือกเฉพาะรายการที่ Status <> 0 หรือไม่ซ้ำ"
+
+    recid "bigint" [note:"RecId ของ AssetBook"]
+    
+    asset_id "nvarchar(50)" [note:"AssetId"]
+    book_id "nvarchar(50)" [note:"BookId ของ AssetBook"]
+    acquisition_date "datetime" [note:"วันที่ตรวจรับ (AcquisitionDate)"]
+    acquisition_price "decimal(18,2)" [note:"จำนวนเงินที่ได้มา (AcquisitionPrice)"]
+    vend_account "nvarchar(100)" [note:"Vendor Account ของ AssetBook"]
+    status "int" [note:"สถานะของ Book (0=ยังไม่ได้รับ, 1=เปิดใช้งาน, ... )"]
+}
