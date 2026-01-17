@@ -1,0 +1,12 @@
+TablePartial Base {
+Note: "Base partial table ที่ใช้เป็น template สำหรับตารางอื่นๆ - มี field พื้นฐานที่ทุกตารางต้องมี รวมถึง audit trail"
+
+id "bigint" [pk, not null, Note: "Primary key"]
+
+created_at "timestamp" [not null, default: ` now () `, Note: "เวลาที่สร้าง record"]
+created_by "bigint" [Note: "User ที่สร้าง record"]
+updated_at "timestamp" [Note: "เวลาที่อัปเดต record ล่าสุด"]
+updated_by "bigint" [Note: "User ที่อัปเดต record ล่าสุด"]
+deleted_at "timestamp" [Note: "เวลาที่ลบ record ล่าสุด"]
+deleted_by "bigint" [Note: "User ที่ลบ record"]
+}

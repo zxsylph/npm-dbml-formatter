@@ -1,0 +1,14 @@
+Table admin_page_permission {
+  Note: "ตารางกำหนดสิทธิ์ว่า admin คนไหนสามารถทำอะไรในหน้าไหน"
+
+  ~Base
+
+  admin_id "bigint" [
+    ref: > admins.id,  note:"ID ผู้ดูแลระบบ"]
+  page_id  "bigint" [
+    ref: > pages.id,  note:"ID ของหน้าในระบบ"
+  ]
+  can_view "smallint" [note:"สิทธิ์ดูหน้า (1 = ได้, 0 = ไม่ได้)  มีไว้ก่อน คงไม่ได้ใช้"]
+  can_edit "smallint" [note:"สิทธิ์แก้ไขหน้า (1 = ได้, 0 = ไม่ได้)"]
+}
+
