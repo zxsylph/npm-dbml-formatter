@@ -41,7 +41,7 @@ export function format(input: string, options: FormatterOptions = {}): string {
                  if (t.type === TokenType.Symbol && (t.value === '}' || t.value === '{')) break;
                  if (t.type === TokenType.Word) {
                      // Check case-insensitive
-                     if (t.value.toLowerCase() === 'table') {
+                     if (t.value.toLowerCase().startsWith('table')) {
                          isTable = true;
                          break;
                      }
