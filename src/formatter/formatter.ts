@@ -407,22 +407,70 @@ export function format(input: string, options: FormatterOptions = {}): string {
                           }
                       }
 
-                     // Apply "Quote Data Types" logic
-                    let wordCount = 0;
-                    for (const t of lineTokens) {
-                         // Only count words before `[`?
-                         if (t.type === TokenType.Symbol && t.value === '[') break;
-                         if (t.type === TokenType.Word) {
-                             wordCount++;
-                             if (wordCount === 2) {
-                                 // Quote this token!
-                                 t.value = `"${t.value}"`; 
-                             }
-                         }
-                         if (t.type === TokenType.String && wordCount < 2) { 
-                             wordCount++; 
-                         }
-                    }
+                      if (isField) {
+                          // 1. Unquote field name if it is quoted
+                          let nameIdx = -1;
+                          for (let k = 0; k < lineTokens.length; k++) {
+                              if (lineTokens[k].type !== TokenType.Whitespace && lineTokens[k].type !== TokenType.Comment) {
+                                  nameIdx = k;
+                                  break;
+                              }
+                          }
+                          
+                          if (nameIdx !== -1) {
+                              const nameTok = lineTokens[nameIdx];
+                              if ((nameTok.value.startsWith('"') && nameTok.value.endsWith('"')) ||
+                                  (nameTok.value.startsWith("'") && nameTok.value.endsWith("'"))) {
+                                  const unquoted = nameTok.value.slice(1, -1);
+                                  if (/^[a-zA-Z0-9_]+$/.test(unquoted)) {
+                                      nameTok.value = unquoted;
+                                      nameTok.type = TokenType.Word;
+                                  }
+                              }
+                          }
+                          
+                          // 2. Quote the entire datatype (including parameters like (255))
+                          // Find Settings Start `[` if exists
+                          let settingsIdx = -1;
+                          for (let k = 0; k < lineTokens.length; k++) {
+                              if (lineTokens[k].type === TokenType.Symbol && lineTokens[k].value === '[') {
+                                  settingsIdx = k;
+                                  break;
+                              }
+                          }
+                          
+                          let typeStart = nameIdx + 1;
+                          while (typeStart < lineTokens.length && (lineTokens[typeStart].type === TokenType.Whitespace || lineTokens[typeStart].type === TokenType.Comment)) {
+                              typeStart++;
+                          }
+                          
+                          let typeEnd = settingsIdx;
+                          if (typeEnd === -1) {
+                              // No settings, type ends at the last meaningful token of the line
+                              let lastMeaningful = -1;
+                              for (let k = lineTokens.length - 1; k >= 0; k--) {
+                                  if (lineTokens[k].type !== TokenType.Whitespace && lineTokens[k].type !== TokenType.Comment) {
+                                      lastMeaningful = k;
+                                      break;
+                                  }
+                              }
+                              if (lastMeaningful > nameIdx) {
+                                  typeEnd = lastMeaningful + 1;
+                              }
+                          }
+                          
+                          if (typeStart !== -1 && typeEnd !== -1 && typeEnd > typeStart) {
+                              const typeTokens = lineTokens.slice(typeStart, typeEnd);
+                              const formattedType = `"${formatDataType(typeTokens)}"`;
+                              const newTypeToken: Token = {
+                                  type: TokenType.String,
+                                  value: formattedType,
+                                  line: lineTokens[typeStart].line,
+                                  column: lineTokens[typeStart].column
+                              };
+                              lineTokens.splice(typeStart, typeEnd - typeStart, newTypeToken);
+                          }
+                      }
                  }
 
                  // 5b. Alignment Pass
@@ -922,4 +970,37 @@ function processTokens(
     }
     
     return localOutput;
+}
+
+function formatDataType(tokens: Token[]): string {
+    let result = '';
+    for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t.type === TokenType.Whitespace || t.type === TokenType.Comment) {
+            continue;
+        }
+        
+        let val = t.value;
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+        }
+        
+        if (result.length > 0) {
+            const lastChar = result[result.length - 1];
+            let needsSpace = true;
+            
+            if (t.type === TokenType.Symbol && (val === '(' || val === ')' || val === ',' || val === ']')) {
+                needsSpace = false;
+            }
+            if (lastChar === '(' || lastChar === '[' || lastChar === '.') {
+                needsSpace = false;
+            }
+            
+            if (needsSpace) {
+                result += ' ';
+            }
+        }
+        result += val;
+    }
+    return result;
 }
